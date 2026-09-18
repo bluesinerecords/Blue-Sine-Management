@@ -1,29 +1,27 @@
+import 'dotenv/config';
 import Fastify from 'fastify';
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
+import pg from 'pg';
+import { registerPhase2Routes } from './routes.js';
+
+export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 export function buildServer() {
   const app = Fastify({ logger: true });
+  (app as any).db = pool;
+  app.register(cookie);
   app.register(cors, { origin: true, credentials: true });
   app.register(helmet);
   app.register(sensible);
-
   app.get('/health', async () => ({ status: 'ok', service: 'blue-sine-api' }));
-  app.get('/api/v1/business', async () => ({
-    tradingName: 'Blue Sine Music Studios',
-    slogan: 'Creating sound. Building stars.',
-    city: 'Kokstad',
-    province: 'KwaZulu-Natal',
-    country: 'South Africa',
-    currency: 'ZAR',
-    timezone: 'Africa/Johannesburg',
-  }));
-
+  registerPhase2Routes(app, pool);
   return app;
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  const app = buildServer();
-  app.listen({ port: Number(process.env.PORT ?? 4000), host: '0.0.0.0' });
+  buildServer().listen({ port: Number(process.env.PORT ?? 4000), host: '0.0.0.0' })
+    .catch((error) => { console.error(error); process.exit(1); });
 }
