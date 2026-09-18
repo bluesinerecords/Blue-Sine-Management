@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { hashPassword } from '../auth.js';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -10,6 +11,11 @@ export async function seed() {
   const businessId = business.rows[0]?.id ?? existing.rows[0].id;
   await pool.query('INSERT INTO business_settings (business_id) VALUES ($1) ON CONFLICT (business_id) DO NOTHING', [businessId]);
   await pool.query('INSERT INTO studios (tenant_id, name) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM studios WHERE tenant_id = $1 AND name = $2)', [businessId, 'Main Studio']);
+
+  const ownerEmail = process.env.SEED_OWNER_EMAIL ?? 'owner@bluesinemusicstudios.co.za';
+  const ownerPassword = process.env.SEED_OWNER_PASSWORD ?? 'change-this-development-password';
+  await pool.query('INSERT INTO app_users (tenant_id, email, display_name, password_hash, role) SELECT $1, $2, $3, $4, $5 WHERE NOT EXISTS (SELECT 1 FROM app_users WHERE tenant_id = $1 AND email = $2)', [businessId, ownerEmail, 'Blue Sine Owner', hashPassword(ownerPassword), 'Owner']);
+
   const services = [
     ['Recording — 1 hour', 'Recording', 60, 200], ['Recording — 1 hour 30 minutes', 'Recording', 90, 250],
     ['Advanced Mixing & Mastering', 'Mixing & Mastering', 90, 500], ['Ready-made Beat', 'Beats', null, 400],
